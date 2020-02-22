@@ -1,2 +1,3 @@
-# 6560-MachineLearning-ClassNotes
-Class Notes of Introduction to Machine Learning
+# Business Analytics Capstone Project
+Bias in Mortgage Lending
+Using HMDA dataset
