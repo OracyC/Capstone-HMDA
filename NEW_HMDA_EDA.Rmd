@@ -1,0 +1,277 @@
+---
+title: "HMDA_EDA"
+author: "Jean Rioux"
+date: "2/9/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+##HMDA EDA
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+orig=read.csv("C:\\Users\\Jean\\Documents\\2020 Spring\\MGMT 6790\\year_2018_state_NY.csv")
+```
+```{r}
+ny.tmp=orig%>%filter(county_code>36000 & county_code<37000)
+
+omitted=c(1,2,4,7,8,14,15,19,20,24,25,28,29,30,31,33,34,35,36,37,38,48,49,51,52,53,54,56,57,58,59,60,62,61,63,64,65,66,67,68,69,70,71,72,73,76,77,80,81,82,83,84,85,86,87,88,90,91,92)
+
+ny=ny.tmp[,-omitted]
+
+
+
+hist(ny$loan_amount)
+summary(ny$loan_amount)
+
+
+frequency(duplicated(ny$lei))
+
+
+e=ny$total_loan_costs
+ny$total_loan_costs=as.numeric(levels(e))[e]
+f=ny$multifamily_affordable_units
+ny$multifamily_affordable_units=as.numeric(levels(f))[f]
+ny$action_taken=factor(ny$action_taken)
+h=ny$property_value
+ny$property_value=as.numeric(levels(h))[h]
+ny$county_code=as.factor(ny$county_code)
+
+ny$loan.per=ny$loan_amount/ny$income
+box=boxplot(ny$property_value,outline=FALSE)
+
+na_count <-sapply(ny, function(y) sum(length(which(is.na(y)))))
+na_count
+
+```
+
+
+```{r}
+
+iqr=1.5*(box$stats[4,]-box$stats[2,])
+n.out=ny%>%filter(property_value>box$stats[2,]-iqr & property_value<box$stats[4,]+iqr)
+n.out$debt_to_income_ratio=factor(n.out$debt_to_income_ratio,levels = c('<20%','20%-<30%','30%-<36%','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50%-60%','>60%','Exempt')
+)
+purch=n.out%>%group_by(county_code)%>%mutate(freq=n())%>%ungroup()%>%filter(freq>100)
+
+purch$property_value=purch$property_value/1000
+hist(purch$property_value,prob=1)
+ggplot(data = purch,aes(x=property_value,color=action_taken))+geom_histogram()
+
+ggplot(purch,aes(x=county_code))+geom_bar()
+
+num.inc=fivenum(ny$income)
+iqr.inc=num.inc[4]-num.inc[2]
+inc.df=ny%>%filter(income<num.inc[4]+iqr.inc & income>num.inc[2]-iqr.inc)
+
+num.loan=fivenum(ny$loan_amount)
+iqr.loan=num.loan[4]-num.loan[2]
+inc.df=inc.df%>%filter(loan_amount<num.loan[4]+iqr.loan & loan_amount>num.loan[2]-iqr.loan)
+
+inc.loan.sc=ggplot(inc.df,aes(x=income,y=loan_amount,color=action_taken))+geom_point()
+inc.loan.sc
+
+```
+
+
+```{r}
+library(usmap)
+count=n.out%>%group_by(county_code)%>%summarize(n())
+action=n.out%>%filter(action_taken==1)%>%group_by(county_code)%>%summarize(n())
+names(action)=c("fips","value")
+
+df=data.frame(na.omit(count))
+names(df)=c("fips","value")
+f=df$fips
+df$fips=as.numeric(levels(f))[f]
+
+# boxplot
+ggplot(df,aes(y=value))+geom_boxplot()
+
+# remove outliers
+nums=fivenum(df$value)
+iqr=nums[4]-nums[2]
+df=df%>%filter(value<nums[3]+iqr)
+
+# plot map
+mort.map=plot_usmap("counties",data=df,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="red",name="Count")+
+  labs(title = "NY State", subtitle = "Number of Mortgage Applications by County (outliers in grey)")+
+  theme(legend.position = "right")
+mort.map
+mort.box=ggplot(df,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Mortgage Applications by County")
+
+
+
+ggplot(action,aes(y=value))+geom_boxplot()
+nums=fivenum(action$value)
+iqr=nums[4]-nums[2]
+action=action%>%filter(value<nums[3]+iqr)
+
+
+action.map=plot_usmap("counties",data=action,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="orange",name="Count")+
+  labs(title = "NY State", subtitle = "Number of Mortgages Originated by County (outliers in grey)")+
+  theme(legend.position = "right")
+action.map
+act.box=ggplot(action,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Mortgage Applications Originated by County")
+
+
+```
+
+```{r}
+
+county.med=aggregate(ny[,39],list(ny$county_code),median,na.rm=TRUE)
+df2=data.frame(na.omit(county.med))
+names(df2)=c("fips","value")
+df2$value=df2$value/1000
+
+ggplot(df2,aes(y=value))+geom_boxplot()
+nums=fivenum(df2$value)
+iqr=nums[4]-nums[2]
+df2=df2%>%filter(value<nums[3]+iqr & value>nums[3]-iqr)
+
+val.map=plot_usmap("counties",data=df2,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="blue",name="Value (000's of $)")+
+  labs(title = "NY State", subtitle = "Average Property Value by County (outliers in grey)")+
+  theme(legend.position = "right")
+val.map
+val.box=ggplot(df2,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Property Value by County")
+```
+```{r}
+library(usmap)
+count=n.out%>%group_by(county_code)%>%summarize(n())
+action=n.out%>%filter(action_taken==1)%>%group_by(county_code)%>%summarize(n())
+names(action)=c("fips","value")
+
+df=data.frame(na.omit(count))
+names(df)=c("fips","value")
+f=df$fips
+df$fips=as.numeric(levels(f))[f]
+
+# boxplot
+ggplot(df,aes(y=value))+geom_boxplot()
+
+# remove outliers
+nums=fivenum(df$value)
+iqr=nums[4]-nums[2]
+df=df%>%filter(value<nums[3]+iqr)
+
+# plot map
+mort.map=plot_usmap("counties",data=df,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="red",name="Count")+
+  labs(title = "NY State", subtitle = "Number of Mortgage Applications by County (outliers in grey)")+
+  theme(legend.position = "right")
+mort.map
+mort.box=ggplot(df,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Mortgage Applications by County")
+
+
+
+ggplot(action,aes(y=value))+geom_boxplot()
+nums=fivenum(action$value)
+iqr=nums[4]-nums[2]
+action=action%>%filter(value<nums[3]+iqr)
+
+
+action.map=plot_usmap("counties",data=action,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="orange",name="Count")+
+  labs(title = "NY State", subtitle = "Number of Mortgages Originated by County (outliers in grey)")+
+  theme(legend.position = "right")
+action.map
+act.box=ggplot(action,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Mortgage Applications Originated by County")
+
+
+```
+
+
+```{r}
+county.std=aggregate(ny[,39],list(ny$county_code),sd,na.rm=TRUE)
+
+df3=data.frame(na.omit(county.std))
+names(df3)=c("fips","value")
+df3$value=df3$value/1000
+
+ggplot(df3,aes(y=value))+geom_boxplot()
+nums=fivenum(df3$value)
+iqr=nums[4]-nums[2]
+df3=df3[df3$fips %in% df2$fips,]
+
+std.map=plot_usmap("counties",data=df3,values="value",include ="NY")+
+  scale_fill_continuous(low="white",high="green",name="Value (000's of $)")+
+  labs(title = "NY State", subtitle = "Standard Deviation of Property Value by County")+
+  theme(legend.position = "right")
+std.map
+std.box=ggplot(df3,aes(y=value))+geom_boxplot()+labs(title = "NY State Boxplot", subtitle = "Standard Deviation of Property Value by County")
+
+```
+
+```{r}
+n.out$debt_to_income_ratio=factor(n.out$debt_to_income_ratio,levels = c('<20%','20%-<30%','30%-<36%','36','37','38','39','40','41','42','43','44','45','46','47','48','49','50%-60%','>60%','Exempt')
+)
+debt.group=n.out%>%group_by(action_taken,debt_to_income_ratio)%>%summarise(n())
+names(debt.group)=c("action_taken","debt_to_income_ratio","count")
+debt.group=debt.group%>%group_by(debt_to_income_ratio)%>%mutate(total=sum(count))
+# debt.group$debt_to_income_ratio=factor(debt.group$debt_to_income_ratio,levels=addNA(debt.group$debt_to_income_ratio))
+action.debt=ggplot(debt.group,aes(x=debt_to_income_ratio,y=count,fill=action_taken))+geom_bar(stat="identity")+theme_bw()+theme(panel.grid=element_blank())
+action.debt
+```
+
+```{r}
+# n.out$derived_race=factor(n.out$derived_race,levels = names(sort(table(), 
+#                                                         decreasing=TRUE)))))
+
+race.group=n.out%>%group_by(action_taken,derived_race)%>%summarize(n())
+names(race.group)=c("action_taken","derived_race","count")
+race.group=race.group%>%group_by(derived_race)%>%mutate(total=sum(count))
+race.macro=race.group%>%group_by(derived_race)%>%summarise(total=sum(count))
+race.macro$per=race.macro$total/sum(race.macro$total)
+
+action.race.orig=ggplot(n.out,aes(x=derived_race,y=action_taken,fill=action_taken))+geom_bar(position="fill",stat="identity")+ coord_cartesian(ylim = c(0, 1))
+action.race.orig
+
+order=race.group%>%filter(action_taken==1)%>%arrange(desc(count/total))
+race.group$derived_race=factor(race.group$derived_race,order$derived_race)
+
+action.race=ggplot(race.group,aes(x=reorder(derived_race,count),y=count,fill=action_taken))+geom_bar(stat="identity")+theme_bw()+theme(panel.grid=element_blank())+theme(axis.text.x = element_text(angle = 45, hjust = 1))
+action.race
+```
+
+```{r}
+n.out$co.applicant_sex=as.factor(n.out$co.applicant_sex)
+library(plyr)
+n.out$co.applicant_sex=mapvalues(n.out$co.applicant_sex,from=c("1","2","3","4","5","6"), to=c("Male","Female","Not_provided","Not_applicable","No co-applicant","Selected both male and female"))
+
+gen.group=n.out%>%group_by(action_taken,derived_sex)%>%summarise(n())
+names(age.group)=c("action_taken","applicant_age","count")
+age.group=age.group%>%group_by(applicant_age)%>%mutate(total=sum(count))
+gen.bp=ggplot(n.out,aes(x=derived_sex,y=action_taken,fill=action_taken))+geom_bar(position="fill",stat="identity")+theme_bw()+theme(panel.grid=element_blank())+coord_cartesian(ylim = c(0,1))
+gen.bp
+
+```
+
+```{r}
+age.group=n.out%>%group_by(action_taken,applicant_age)%>%summarize(n())
+names(age.group)=c("action_taken","applicant_age","count")
+age.group=age.group%>%group_by(applicant_age)%>%mutate(total=sum(count))
+
+
+age.group$applicant_age=factor(age.group$applicant_age,levels = c('<25','25-34','35-44','45-54','55-64','65-74','>74','8888'))
+
+action.age=ggplot(age.group,aes(x=applicant_age,y=count,fill=action_taken))+geom_bar(position = "fill",stat="identity")+theme_bw()+theme(panel.grid=element_blank())
+action.age
+```
+
+
+```{r}
+tract.min=ggplot(data = n.out,aes(x=tract_minority_population_percent,fill=action_taken))+geom_histogram()+theme_bw()+theme(panel.grid=element_blank())
+
+inc=ggplot(data = inc.df,aes(x=income,fill=action_taken))+geom_histogram()+theme_bw()+theme(panel.grid=element_blank())
+
+approved=orig%>%filter(action_taken==1)
+```
+
