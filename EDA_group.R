@@ -33,12 +33,11 @@ ggplot(data) +
 #corrplot(res)
 #corrplot(res,add=TRUE, type="lower", method="number",diag=FALSE,tl.pos="n", cl.pos="n")
 #summary(data$hud_median_family_income)
-mydata$debt
-x = mydata[c("loan_purpose","loan_amount","loan_to_value_ratio","interest_rate","total_loan_costs","lender_credits","loan_term","property_value","income","applicant_ethnicity.1","applicant_race.1","applicant_sex","action_taken")]
-x$action_taken <- as.numeric(x$action_taken)
-y <- as.numeric(unlist(y))
+
+x <- mydata[c("loan_purpose","loan_amount","loan_to_value_ratio","interest_rate","total_loan_costs","lender_credits","loan_term","property_value","income","applicant_ethnicity.1","applicant_race.1","applicant_sex","action_taken")]
+x[,1:13] <- lapply(x[,1:13],as.numeric)
 res = cor(x, x,use="pairwise.complete.obs")
-str(x)
+
 library(psych)
 corr.test(x, x)
 library(corrplot)
