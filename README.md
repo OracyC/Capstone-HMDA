@@ -1,3 +1,3 @@
 # Business Analytics Capstone Project
-Bias in Mortgage Lending
-Using HMDA dataset
+Bias in Mortgage Lending <br> 
+Using HMDA dataset <br> 
